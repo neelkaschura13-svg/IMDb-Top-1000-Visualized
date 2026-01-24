@@ -3,40 +3,37 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-
-#Dataframe import
-
-
-#in graphs create tabs
-#for all three add actors search bar also
-
-
-
+#Importing Dataframe
 base_url = "https://docs.google.com/spreadsheets/d/"
 url_id = "1omsl7c0QmuYyJ4uoKtuX_LfowAOwioUpO69B-uhCsTc/"
 export = "export/format=excel"
 whole_url = base_url + url_id + export
 
-@st.cache_data()   
-def load_data(): 
-    df = pd.read_excel(whole_url, na_values="None")
-    return df
 
-#loading data 
-st.session_state.data = load_data()
+# Function to load data with caching
+@st.cache_data()
+def load_data():
+    try:
+        df = pd.read_excel(whole_url, na_values="None")
+        return df
+    except Exception as e:
+        st.error(f"An error occurred while loading data: {e}")
+        return pd.DataFrame()
+
+if 'data' not in st.session_state:
+    st.session_state.data = load_data()
+
 df = st.session_state.data.copy()
 
 
+st.set_page_config(layout="wide")
 #Homepage title 
-st.set_page_config(page_title="IMDb Top 1000 Movies: Data Visualization", layout="wide")
-
 st.title("IMDb Top 1000 Movies")
 st.markdown("""
-This app visualizes the top 1000 movies from IMDb. Explore trends in ratings, genres, release years, and box office performance.
+This app showcases IMDb's Top 1000 Movies as of 2020. It features an interactive movie catalog with multiple filiters to sort by genre, director, and cast presented by a spreadsheet and list with movie posters. Additionally, the app includes a visualization section where you can select filters to generate graphs, providing a way to analyze and discover top-rated films.
 """)
 
-
-#Increasing resolution of Movie posters
+#Increase resolution of movie posters
 def enhance_poster_url(poster_url):
     """
     Increase resolution of Amazon movie poster URLs using specific dimensions
@@ -49,7 +46,6 @@ def enhance_poster_url(poster_url):
     return enhanced_url
 
 
-
 #Search Bar 
 st.markdown("<h2 style='font-size: 28px;'>IMDb Top 1000 Movies - Advanced Search</h2>", unsafe_allow_html=True)
 
@@ -58,7 +54,6 @@ search_query = st.text_input("Search Movies by Title, Director, Genre, or Actor"
 # Initialize with empty dataframe
 filtered_df = pd.DataFrame()
 
-# Runs only when Enter is clicked
 if search_query.strip():  #Strips spaces
     filtered_df = df[
         df['Series_Title'].str.contains(search_query, case=False, na=False) |
@@ -82,7 +77,7 @@ if search_query.strip():
             
             with col1:
                 if pd.notna(movie['Poster_Link']) and movie['Poster_Link'] != '':
-                    st.image(enhance_poster_url(movie['Poster_Link']), caption="", use_container_width=True)
+                    st.image(enhance_poster_url(movie['Poster_Link']), width=210)
             
             with col2:
                 st.markdown(f"<h2 style='font-size: 24px; margin-top: 0px;'>{rank}. {movie['Series_Title']} ({int(movie['Released_Year'])})</h2>", unsafe_allow_html=True)
@@ -97,4 +92,6 @@ if search_query.strip():
         st.write("No movies match your search criteria. Try searching by movie title, director, genre, or lead actor.")
 else:
     st.write("Enter a search term above to find movies.")
+
+
 
