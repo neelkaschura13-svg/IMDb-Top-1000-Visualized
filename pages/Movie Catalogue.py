@@ -6,14 +6,22 @@ import seaborn as sns
 
 st.title("Movie Catalogue")
 st.markdown("""
-This page allows you to find movies based on your Genre prefrences or Director prefrence. 
+This Page allows you to search for movies as per year, votes, genres, directors and actors.
 """)
 
 df = st.session_state.data.copy()
 
-
-# Convert Released_Year to integer
 df['Released_Year'] = pd.to_numeric(df['Released_Year'], errors='coerce')
+
+
+# Convert Released_Year to numeric
+df['Released_Year'] = pd.to_numeric(df['Released_Year'], errors='coerce')
+
+# Split genres into individual genres and create a unique list
+all_genres = df['Genre'].str.split(',').explode().str.strip().unique()
+
+# Combine all actor columns into a single series
+all_actors = pd.concat([df['Star1'], df['Star2'], df['Star3'], df['Star4']]).str.strip().unique()
 
 # Sidebar filters
 st.sidebar.header("Filters")
@@ -27,67 +35,91 @@ selected_years = st.sidebar.slider(
     value=(min_year, max_year)
 )
 
-# Genre filter
-all_genres = df['Genre'].str.split(',').explode().str.strip().unique()
-selected_genres = st.sidebar.multiselect(
-    "Select Genres",
-    options=all_genres,
-    default=[]
+# Number of votes filter
+min_votes, max_votes = int(df['No_of_Votes'].min()), int(df['No_of_Votes'].max())
+selected_votes = st.sidebar.slider(
+    "Select Number of Votes Range",
+    min_value=min_votes,
+    max_value=max_votes,
+    value=(min_votes, max_votes)
 )
 
-# Director filter
-all_directors = df['Director'].str.split(',').explode().str.strip().unique()
-selected_directors = st.sidebar.multiselect(
-    "Select Directors",
-    options=all_directors,
-    default=[]
-)
+selected_genres = st.sidebar.multiselect('Select Genres', all_genres)
+selected_directors = st.sidebar.multiselect('Select Directors', df['Director'].unique())
+selected_actors = st.sidebar.multiselect('Select Actors', all_actors)
 
-#AND/OR logic
-logic_mode = st.sidebar.radio("Filter Logic", ("OR (Any Selected Genre/Director)", "AND (All Selected Genre/Director)"), index=0)
-filtered_df = df[
-    (df['Released_Year'] >= selected_years[0]) &
-    (df['Released_Year'] <= selected_years[1])
-]
+# AND/OR/NOT logic
+logic_mode = st.sidebar.radio("Filter Logic", ("OR (Any Selected Genre/Director/Actor)", "AND (All Selected Genre/Director/Actor)", "NOT (Exclude Selected Genre/Director/Actor)"), index=0)
 
+# Initialize show_list
 show_list = False
 
-# Genre and director filtering based on logic mode
-if selected_genres or selected_directors:
-    if logic_mode == "AND (All Selected Genre/Director)":
-        def has_all_criteria(movie_genres, movie_directors):
+# Filtering logic
+filtered_df = df[
+    (df['Released_Year'] >= selected_years[0]) &
+    (df['Released_Year'] <= selected_years[1]) &
+    (df['No_of_Votes'] >= selected_votes[0]) &
+    (df['No_of_Votes'] <= selected_votes[1])
+]
+
+if selected_genres or selected_directors or selected_actors:
+    show_list = True
+    if logic_mode == "AND (All Selected Genre/Director/Actor)":
+        def has_all_criteria(movie_genres, movie_directors, movie_actors):
             movie_genres_list = [g.strip().lower() for g in movie_genres.split(',')]
             movie_directors_list = [d.strip().lower() for d in movie_directors.split(',')]
+            movie_actors_list = [a.strip().lower() for a in movie_actors]
             selected_genres_lower = [g.lower() for g in selected_genres]
             selected_directors_lower = [d.lower() for d in selected_directors]
-            
+            selected_actors_lower = [a.lower() for a in selected_actors]
+
             genre_match = all(genre in movie_genres_list for genre in selected_genres_lower) if selected_genres else True
             director_match = all(director in movie_directors_list for director in selected_directors_lower) if selected_directors else True
-            
-            return genre_match and director_match
-        
-        filtered_df = filtered_df[filtered_df.apply(lambda row: has_all_criteria(row['Genre'], row['Director']), axis=1)]
-    else:
-        def has_any_criteria(movie_genres, movie_directors):
+            actor_match = all(actor in movie_actors_list for actor in selected_actors_lower) if selected_actors else True
+
+            return genre_match and director_match and actor_match
+
+        filtered_df = filtered_df[filtered_df.apply(lambda row: has_all_criteria(row['Genre'], row['Director'], [row['Star1'], row['Star2'], row['Star3'], row['Star4']]), axis=1)]
+    elif logic_mode == "OR (Any Selected Genre/Director/Actor)":
+        def has_any_criteria(movie_genres, movie_directors, movie_actors):
             movie_genres_list = [g.strip().lower() for g in movie_genres.split(',')]
             movie_directors_list = [d.strip().lower() for d in movie_directors.split(',')]
+            movie_actors_list = [a.strip().lower() for a in movie_actors]
             selected_genres_lower = [g.lower() for g in selected_genres]
             selected_directors_lower = [d.lower() for d in selected_directors]
-            
+            selected_actors_lower = [a.lower() for a in selected_actors]
+
             genre_match = any(genre in movie_genres_list for genre in selected_genres_lower) if selected_genres else False
             director_match = any(director in movie_directors_list for director in selected_directors_lower) if selected_directors else False
-            
-            return genre_match or director_match
-        
-        filtered_df = filtered_df[filtered_df.apply(lambda row: has_any_criteria(row['Genre'], row['Director']), axis=1)]
+            actor_match = any(actor in movie_actors_list for actor in selected_actors_lower) if selected_actors else False
 
+            return genre_match or director_match or actor_match
+
+        filtered_df = filtered_df[filtered_df.apply(lambda row: has_any_criteria(row['Genre'], row['Director'], [row['Star1'], row['Star2'], row['Star3'], row['Star4']]), axis=1)]
+    elif logic_mode == "NOT (Exclude Selected Genre/Director/Actor)":
+        def has_not_criteria(movie_genres, movie_directors, movie_actors):
+            movie_genres_list = [g.strip().lower() for g in movie_genres.split(',')]
+            movie_directors_list = [d.strip().lower() for d in movie_directors.split(',')]
+            movie_actors_list = [a.strip().lower() for a in movie_actors]
+            selected_genres_lower = [g.lower() for g in selected_genres]
+            selected_directors_lower = [d.lower() for d in selected_directors]
+            selected_actors_lower = [a.lower() for a in selected_actors]
+
+            genre_match = not any(genre in movie_genres_list for genre in selected_genres_lower) if selected_genres else True
+            director_match = not any(director in movie_directors_list for director in selected_directors_lower) if selected_directors else True
+            actor_match = not any(actor in movie_actors_list for actor in selected_actors_lower) if selected_actors else True
+
+            return genre_match and director_match and actor_match
+
+        filtered_df = filtered_df[filtered_df.apply(lambda row: has_not_criteria(row['Genre'], row['Director'], [row['Star1'], row['Star2'], row['Star3'], row['Star4']]), axis=1)]
+
+# Display the number of filtered movies
 st.sidebar.markdown(f"**Movies shown:** {len(filtered_df)}")
 
-
-
-if selected_genres or selected_directors or (selected_years != (min_year, max_year)):
+# Check if any filters are applied
+if selected_genres or selected_directors or selected_actors or (selected_years != (min_year, max_year)) or (selected_votes != (min_votes, max_votes)):
     show_list = True
-    
+
 # Display results
 st.markdown("<style>img {max-width: 100%; height: auto;}</style>", unsafe_allow_html=True)
 
@@ -122,13 +154,15 @@ if len(filtered_df) > 0:
     # Display without pandas index
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 
+
+    
 # Display results
 if len(filtered_df) > 0:
     if show_list:  # Only show list if filters are applied
         st.subheader("Movie Details")
         for idx, movie in filtered_df.iterrows():
             rank = idx + 1
-            col1, col2 = st.columns([1, 3])
+            col1, col2 = st.columns([1, 5])
             
             with col1:
                 if pd.notna(movie['Poster_Link']) and movie['Poster_Link'] != '':
