@@ -23,6 +23,7 @@ all_genres = df['Genre'].str.split(',').explode().str.strip().unique()
 # Combine all actor columns into a single series
 all_actors = pd.concat([df['Star1'], df['Star2'], df['Star3'], df['Star4']]).str.strip().unique()
 
+
 # Sidebar filters
 st.sidebar.header("Filters")
 
@@ -61,6 +62,7 @@ filtered_df = df[
     (df['No_of_Votes'] >= selected_votes[0]) &
     (df['No_of_Votes'] <= selected_votes[1])
 ]
+
 
 if selected_genres or selected_directors or selected_actors:
     show_list = True
@@ -154,36 +156,80 @@ if len(filtered_df) > 0:
     # Display without pandas index
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 
+# Initialize watched_count and watched_list in session state
+if 'watched_count' not in st.session_state:
+    st.session_state.watched_count = 0
+if 'watched_list' not in st.session_state:
+    st.session_state.watched_list = []
 
-    
+tab1, tab2 = st.tabs(["Movie List", "Movies Watched"])
 # Display results
-if len(filtered_df) > 0:
-    if show_list:  # Only show list if filters are applied
-        st.subheader("Movie Details")
-        for idx, movie in filtered_df.iterrows():
-            rank = idx + 1
-            col1, col2 = st.columns([1, 5])
+with tab1:
+    if len(filtered_df) > 0:
+        if show_list:  # Only show list if filters are applied
+            st.subheader("Movie Details")
+            for idx, movie in filtered_df.iterrows():
+                rank = idx + 1
+                col1, col2, col3 = st.columns([1, 4, 1])
             
-            with col1:
-                if pd.notna(movie['Poster_Link']) and movie['Poster_Link'] != '':
-                    st.image(enhance_poster_url(movie['Poster_Link']), width=210)
+                with col1:
+                    if pd.notna(movie['Poster_Link']) and movie['Poster_Link'] != '':
+                        st.image(enhance_poster_url(movie['Poster_Link']), width=210)
             
-            with col2:
-                st.markdown(f"<h2 style='font-size: 24px;'>{rank}. {movie['Series_Title']} ({int(movie['Released_Year'])})</h2>", unsafe_allow_html=True)
-                st.markdown(f"*Rating:* {movie['IMDB_Rating']}")
-                st.markdown(f"*Genre:* {movie['Genre']}")
-                st.markdown(f"*Director:* {movie['Director']}")
-                st.markdown(f"*Overview:* {movie['Overview']}")
-                st.markdown(f"*Stars:* {movie['Star1']}, {movie['Star2']}, {movie['Star3']}, {movie['Star4']}")
-                st.markdown(f"<span style='font-family: monospace;'>*Votes:* {int(movie['No_of_Votes']):,}</span>", unsafe_allow_html=True)
-            st.markdown("---")
-    else:
-        # Show initial message when no filters applied
-        st.info("Apply filters above to see movie details")
-else:
-    if show_list:
-        st.write("No movies match your search criteria.")
-    else:
-        st.info("Apply filters above to see movie details")
+                with col2:
+                    st.markdown(f"<h2 style='font-size: 24px;'>{rank}. {movie['Series_Title']} ({int(movie['Released_Year'])})</h2>", unsafe_allow_html=True)
+                    st.markdown(f"*Rating:* {movie['IMDB_Rating']}")
+                    st.markdown(f"*Genre:* {movie['Genre']}")
+                    st.markdown(f"*Director:* {movie['Director']}")
+                    st.markdown(f"*Overview:* {movie['Overview']}")
+                    st.markdown(f"*Stars:* {movie['Star1']}, {movie['Star2']}, {movie['Star3']}, {movie['Star4']}")
+                    st.markdown(f"<span style='font-family: monospace;'>*Votes:* {int(movie['No_of_Votes']):,}</span>", unsafe_allow_html=True)
+             
+                with col3:
+                    if st.checkbox(f"Did you watch this movie?", key=f"watched_{idx}", value=(movie['Series_Title'] in st.session_state.watched_list)):
+                        if movie['Series_Title'] not in st.session_state.watched_list:
+                            st.session_state.watched_list.append(movie['Series_Title'])
+                            st.session_state.watched_count += 1
+                    else:
+                        if movie['Series_Title'] in st.session_state.watched_list:
+                            st.session_state.watched_list.remove(movie['Series_Title'])
+                            st.session_state.watched_count -= 1
 
+                st.markdown("---")
+
+            st.sidebar.markdown(
+                f"""
+                <style>
+                .sidebar-watched-count {{
+                    position: fixed;
+                    top: 10px;
+                    right: 1400px;
+                    background-color: rgba(0, 0, 0, 0);
+                    padding: 10px;
+                    border-radius: 5px;
+                    box-shadow: 0 2px 5px rgba(0, 0, 0, 0);
+                    z-index: 1000;
+                    font-size: 22px;
+                }}
+                </style>
+                <div class="sidebar-watched-count">
+                    <strong>Movies Watched: {st.session_state.watched_count}</strong>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+              
+        else:
+            # Show initial message when no filters applied
+            st.info("Apply filters above to see movie details")
+    else:
+        if show_list:
+            st.write("No movies match your search criteria.")
+        else:
+            st.info("Apply filters above to see movie details")
+with tab2:
+    st.title("Movies Watched")
+    st.write(f"Number of movies watched: {st.session_state.watched_count}")
+    for idx, movie in enumerate(st.session_state.watched_list, start=1):
+        st.write(f"{idx}. {movie}")
         
