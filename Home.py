@@ -51,6 +51,16 @@ if 'data2' not in st.session_state:
 df = st.session_state.data.copy()
 df2 = st.session_state.data2.copy()
 
+#load watch list 
+if 'watched_list' not in st.session_state:
+    st.session_state.watched_list = []
+if 'watched_count' not in st.session_state:
+    st.session_state.watched_count = 0
+
+if 'watched_list2' not in st.session_state:
+    st.session_state.watched_list2 = []
+if 'watched_count2' not in st.session_state:
+    st.session_state.watched_count2 = 0
 
 # Increase resolution of movie posters for Dataframe 1
 def enhance_poster_url(poster_url):
@@ -99,11 +109,11 @@ This app showcases IMDb's Top 1000 Movies as of 2020 and a catalog of 7000 movie
 """)
 
 # Search Bar
-tab1, tab2 = st.tabs(["Imdb Top 1000", "Netflix TV Shows and Movies"])
+tab1, tab2, tab3 = st.tabs(["Imdb Top 1000", "Netflix TV Shows and Movies", "Watched Movies and Shows"])
+
 with tab1:
     search_query = st.text_input("", placeholder="Search Movies by Title, Director, Genre, or Actor")
     # Display the entered text
-    st.write("You entered:", search_query)
 
     # Initialize with empty dataframe
     filtered_df = pd.DataFrame()
@@ -127,7 +137,7 @@ with tab1:
             st.subheader("Movie Details")
             for idx, movie in filtered_df.iterrows():
                 rank = idx + 1
-                col1, col2 = st.columns([1, 5])
+                col1, col2, col3 = st.columns([1, 4, 1])
 
                 with col1:
                     if pd.notna(movie['Poster_Link']) and movie['Poster_Link'] != '':
@@ -141,7 +151,19 @@ with tab1:
                     st.markdown(f"*Overview:* {movie['Overview']}")
                     st.markdown(f"*Actors:* {movie['Star1']}, {movie['Star2']}, {movie['Star3']}, {movie['Star4']}")
                     st.markdown(f"<span style='font-family: monospace;'>*Votes:* {int(movie['No_of_Votes']):,}</span>", unsafe_allow_html=True)
-                st.markdown("---")
+
+                with col3:
+                    if st.checkbox(f"Did you watch this movie?", key=f"watched_{idx}", value=(movie['Series_Title'] in st.session_state.watched_list)):
+                        if movie['Series_Title'] not in st.session_state.watched_list:
+                            st.session_state.watched_list.append(movie['Series_Title'])
+                            st.session_state.watched_count += 1
+                    else:
+                        if movie['Series_Title'] in st.session_state.watched_list:
+                            st.session_state.watched_list.remove(movie['Series_Title'])
+                            st.session_state.watched_count -= 1
+                            
+                    st.markdown("---")
+
         else:
             st.write("No movies match your search criteria. Try searching by movie title, director, genre, or lead actor.")
 
@@ -170,7 +192,7 @@ with tab2:
         if len(filtered_df2) > 0:
             st.subheader("Movie and TV Show Details")
             for idx, movie in filtered_df2.iterrows():
-                col1, col2 = st.columns([1, 5])
+                col1, col2, col3 = st.columns([1, 4, 1])
 
                 with col1:
                     if pd.notna(movie['image_url']) and movie['image_url'] != '':
@@ -215,6 +237,37 @@ with tab2:
                         f"<span style='font-family: monospace;'>*Votes:* {safe_votes(movie['numVotes'])}</span>",
                         unsafe_allow_html=True
                     )
+
+                with col3:
+                    if st.checkbox(f"Did you watch this movie?", key=f"watched_{idx}", value=(movie['title'] in st.session_state.watched_list2)):
+                        if movie['title'] not in st.session_state.watched_list2:
+                            st.session_state.watched_list2.append(movie['title'])
+                            st.session_state.watched_count2 += 1
+                    else:
+                        if movie['title'] in st.session_state.watched_list2:
+                            st.session_state.watched_list2.remove(movie['title'])
+                            st.session_state.watched_count2 -= 1
+                            
                     st.markdown("---")
         else:
             st.write("No movies match your search criteria. Try searching by movie title, director, genre, or lead actor.")
+
+with tab3: 
+    st.title("All Movies Watched (Combined)")
+
+    # Combine both lists
+    combined_watched = st.session_state.watched_list + st.session_state.watched_list2
+
+    # Remove duplicates (optional, but recommended)
+    unique_combined = list(set(combined_watched))
+
+    # Sort alphabetically (optional)
+    unique_combined.sort()
+
+    # Display
+    if unique_combined:
+        st.write(f"Total unique movies watched: {len(unique_combined)}")
+        for idx, movie in enumerate(unique_combined, start=1):
+            st.write(f"{idx}. {movie}")
+    else:
+        st.write("No movies have been marked as watched yet.")
