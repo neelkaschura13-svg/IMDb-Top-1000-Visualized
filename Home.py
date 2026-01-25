@@ -3,14 +3,19 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-#Importing Dataframe
+# Importing Dataframe 1
 base_url = "https://docs.google.com/spreadsheets/d/"
 url_id = "1omsl7c0QmuYyJ4uoKtuX_LfowAOwioUpO69B-uhCsTc/"
 export = "export/format=excel"
 whole_url = base_url + url_id + export
 
+# Importing Dataframe 2 (new URL)
+base_url2 = "https://docs.google.com/spreadsheets/d/"
+url_id2 = "1PrK_WYNta_6f18WxnsjPVlEQdYCytL2yAv2EKQDTzQg/"
+export2 = "export/format=excel"
+whole_url2 = base_url2 + url_id2 + export2
 
-# Function to load data with caching
+# Loading data with caching for Dataframe 1
 @st.cache_data()
 def load_data():
     try:
@@ -20,78 +25,196 @@ def load_data():
         st.error(f"An error occurred while loading data: {e}")
         return pd.DataFrame()
 
+# Loading data with caching for Dataframe 2
+@st.cache_data()
+def load_data2():
+    try:
+        # Use requests to get the file content
+        import requests
+        response = requests.get(whole_url2)
+        response.raise_for_status()  # Raise an error for bad status codes
+
+        # Read Excel from bytes
+        df2 = pd.read_excel(response.content, na_values="None")
+        return df2
+    except Exception as e:
+        st.error(f"An error occurred while loading Dataframe 2: {e}")
+        return pd.DataFrame()
+        
+# Load the dataframes and store them in session state
 if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
+if 'data2' not in st.session_state:
+    st.session_state.data2 = load_data2()
+
 df = st.session_state.data.copy()
+df2 = st.session_state.data2.copy()
 
 
-st.set_page_config(layout="wide")
-#Homepage title 
-st.title("IMDb Top 1000 Movies")
-st.markdown("""
-This app showcases IMDb's Top 1000 Movies as of 2020. It features an interactive movie catalog with multiple filiters to sort by genre, director, and cast presented by a spreadsheet and list with movie posters. Additionally, the app includes a visualization section where you can select filters to generate graphs, providing a way to analyze and discover top-rated films.
-""")
-
-#Increase resolution of movie posters
+# Increase resolution of movie posters for Dataframe 1
 def enhance_poster_url(poster_url):
     """
     Increase resolution of Amazon movie poster URLs using specific dimensions
     """
     if not poster_url or not poster_url.startswith('https://m.media-amazon.com/images/'):
         return poster_url
-    
-    enhanced_url = poster_url.replace('_V1_UX67_CR0,0,67,98_AL_', '_V1_SY1000_')
-    
+
+    enhanced_url = poster_url.replace('_V1_UX67_CR0,0,67,98_AL_', '_V1_UX200_CR0,0,200,300_AL_')
+
     return enhanced_url
 
+# Reduce resolution of movie posters for Dataframe 2
+def reduce_poster_url(image_url):
+    """
+    Reduce resolution of Amazon movie poster URLs using specific dimensions
+    """
+    if not image_url or not image_url.startswith('https://m.media-amazon.com/images/'):
+        return image_url
 
-#Search Bar 
-st.markdown("<h2 style='font-size: 28px;'>IMDb Top 1000 Movies - Advanced Search</h2>", unsafe_allow_html=True)
+    reduced_url = image_url.replace('_V1_FMjpg_UX1000_', '_V1_UX200_CR0,0,200,300_AL_')
 
-search_query = st.text_input("Search Movies by Title, Director, Genre, or Actor", "")
+    return reduced_url
 
-# Initialize with empty dataframe
-filtered_df = pd.DataFrame()
+df2['cast_clean'] = (
+    df2['cast']
+    .str.replace("'", "", regex=True)
+    .str.replace(r"$\s*", "", regex=True)
+    .str.replace(r"\s*$", "", regex=True)
+    .str.replace(r",\s*", ", ", regex=True)
+    .str.strip("[]")   
+    .str.strip()
+)
 
-if search_query.strip():  #Strips spaces
-    filtered_df = df[
-        df['Series_Title'].str.contains(search_query, case=False, na=False) |
-        df['Director'].str.contains(search_query, case=False, na=False) |
-        df['Star1'].str.contains(search_query, case=False, na=False) |
-        df['Star2'].str.contains(search_query, case=False, na=False) |
-        df['Star3'].str.contains(search_query, case=False, na=False) |
-        df['Star4'].str.contains(search_query, case=False, na=False) |
-        df['Genre'].str.contains(search_query, case=False, na=False)
-    ]
+def safe_votes(value, placeholder="–"):
+    return placeholder if pd.isna(value) else f"{int(value):,}"
+                    
+# Page layout
+st.set_page_config(layout="wide")
 
-# Display results
-if search_query.strip():
-    st.subheader(f"Showing {len(filtered_df)} movies")
-    
-    if len(filtered_df) > 0:
-        st.subheader("Movie Details")
-        for idx, movie in filtered_df.iterrows():
-            rank = idx + 1
-            col1, col2 = st.columns([1, 3])
-            
-            with col1:
-                if pd.notna(movie['Poster_Link']) and movie['Poster_Link'] != '':
-                    st.image(enhance_poster_url(movie['Poster_Link']), width=210)
-            
-            with col2:
-                st.markdown(f"<h2 style='font-size: 24px; margin-top: 0px;'>{rank}. {movie['Series_Title']} ({int(movie['Released_Year'])})</h2>", unsafe_allow_html=True)
-                st.markdown(f"*Rating:* {movie['IMDB_Rating']}")
-                st.markdown(f"*Genre:* {movie['Genre']}")
-                st.markdown(f"*Director:* {movie['Director']}")
-                st.markdown(f"*Overview:* {movie['Overview']}")
-                st.markdown(f"*Actors:* {movie['Star1']}, {movie['Star2']}, {movie['Star3']}, {movie['Star4']}")
-                st.markdown(f"*Votes:* {int(movie['No_of_Votes'])}")
-            st.markdown("---")
+# Homepage title and summary
+st.markdown("<h1 style='font-size: 69px;'>Film List: IMDb & Netflix</h1>", unsafe_allow_html=True)
+st.markdown("""
+This app showcases IMDb's Top 1000 Movies as of 2020 and a catalog of 7000 movies, TV shows and specials from Netflix. It features an interactive movie catalog with multiple filters to sort by genre, director, and cast presented by a spreadsheet and list with movie posters. Additionally, the app includes a visualization section where you can select filters to generate graphs, providing a way to analyze and discover top-rated films.
+""")
+
+# Search Bar
+tab1, tab2 = st.tabs(["Imdb Top 1000", "Netflix TV Shows and Movies"])
+with tab1:
+    search_query = st.text_input("", placeholder="Search Movies by Title, Director, Genre, or Actor")
+    # Display the entered text
+    st.write("You entered:", search_query)
+
+    # Initialize with empty dataframe
+    filtered_df = pd.DataFrame()
+
+    if search_query.strip():  # Strips spaces
+        filtered_df = df[
+            df['Series_Title'].str.contains(search_query, case=False, na=False) |
+            df['Director'].str.contains(search_query, case=False, na=False) |
+            df['Star1'].str.contains(search_query, case=False, na=False) |
+            df['Star2'].str.contains(search_query, case=False, na=False) |
+            df['Star3'].str.contains(search_query, case=False, na=False) |
+            df['Star4'].str.contains(search_query, case=False, na=False) |
+            df['Genre'].str.contains(search_query, case=False, na=False)
+        ]
+
+    # Display results
+    if search_query.strip():
+        st.subheader(f"Showing {len(filtered_df)} movies")
+
+        if len(filtered_df) > 0:
+            st.subheader("Movie Details")
+            for idx, movie in filtered_df.iterrows():
+                rank = idx + 1
+                col1, col2 = st.columns([1, 5])
+
+                with col1:
+                    if pd.notna(movie['Poster_Link']) and movie['Poster_Link'] != '':
+                        st.image(enhance_poster_url(movie['Poster_Link']), width=210)
+
+                with col2:
+                    st.markdown(f"<h2 style='font-size: 24px; margin-top: 0px;'>{rank}. {movie['Series_Title']} ({int(movie['Released_Year'])})</h2>", unsafe_allow_html=True)
+                    st.markdown(f"*Rating:* {movie['IMDB_Rating']}")
+                    st.markdown(f"*Genre:* {movie['Genre']}")
+                    st.markdown(f"*Director:* {movie['Director']}")
+                    st.markdown(f"*Overview:* {movie['Overview']}")
+                    st.markdown(f"*Actors:* {movie['Star1']}, {movie['Star2']}, {movie['Star3']}, {movie['Star4']}")
+                    st.markdown(f"<span style='font-family: monospace;'>*Votes:* {int(movie['No_of_Votes']):,}</span>", unsafe_allow_html=True)
+                st.markdown("---")
+        else:
+            st.write("No movies match your search criteria. Try searching by movie title, director, genre, or lead actor.")
+
+with tab2:
+    search_query2 = st.text_input("", placeholder="Search Movies TV Shows by Title, Language, Genre or by Actor")
+    filtered_df2 = pd.DataFrame()
+    if search_query2.strip():
+        try:
+            filtered_df2 = df2[
+                df2['title'].str.contains(search_query2, case=False, na=False) |
+                df2['language'].str.contains(search_query2, case=False, na=False) |
+                df2['cast'].str.contains(search_query2, case=False, na=False) |
+                df2['genres'].str.contains(search_query2, case=False, na=False)
+            ]
+        except KeyError as e:
+            st.error(f"Column not found: {e}")
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
     else:
-        st.write("No movies match your search criteria. Try searching by movie title, director, genre, or lead actor.")
-else:
-    st.write("Enter a search term above to find movies.")
+        filtered_df2 = df2.copy()
 
+    # Display results
+    if search_query2.strip():
+        st.subheader(f"Showing {len(filtered_df2)} movies and TV shows")
 
+        if len(filtered_df2) > 0:
+            st.subheader("Movie and TV Show Details")
+            for idx, movie in filtered_df2.iterrows():
+                col1, col2 = st.columns([1, 5])
 
+                with col1:
+                    if pd.notna(movie['image_url']) and movie['image_url'] != '':
+                        st.image(reduce_poster_url(movie['image_url']), width=210)
+
+                with col2:
+
+                    # Define safe_int once at the top of your script
+                    def safe_int(value, default="?"):
+                        return int(value) if pd.notna(value) else default
+                    
+                    # Get start year safely
+                    start_year = safe_int(movie['startYear'])
+                    
+                    # Check if it's a movie
+                    if movie['type'] == 'movie':
+                        years_text = f"({start_year})"
+                    elif movie['type'] == 'tvSeries' or 'tvMiniSeries':
+                        if pd.isna(movie['endYear']):
+                            # Ongoing series — show "Present (as of 2021)"
+                            years_text = f"({start_year}) – (Present (as of 2021))"
+                        else:
+                            # Series that ended
+                            end_year = safe_int(movie['endYear'])
+                            years_text = f"({start_year}) – ({end_year})"
+                    else:
+                        # Fallback (in case of unknown type)
+                        years_text = f"({start_year})"
+                    
+                    # Render the title
+                    st.markdown(
+                        f"<h2 style='font-size: 24px; margin-top: 0px;'>{movie['title']} {years_text}</h2>",
+                        unsafe_allow_html=True
+                    )
+                    st.markdown(f"*Rating:* {movie['rating']}")
+                    st.markdown(f"*Genre:* {movie['genres']}")
+                    st.markdown(f"*Language:* {movie['language']}")
+                    st.markdown(f"*Overview:* {movie['summary']}")
+                    st.markdown(f"*Actors:* {movie['cast_clean']}")
+                    st.markdown(f"*Country:* {movie['orign_country']}")
+                    st.markdown(
+                        f"<span style='font-family: monospace;'>*Votes:* {safe_votes(movie['numVotes'])}</span>",
+                        unsafe_allow_html=True
+                    )
+                    st.markdown("---")
+        else:
+            st.write("No movies match your search criteria. Try searching by movie title, director, genre, or lead actor.")
