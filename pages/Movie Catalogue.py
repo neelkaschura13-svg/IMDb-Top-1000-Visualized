@@ -3,32 +3,27 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-
-st.title("Movie Catalogue")
-st.markdown("""
-This Page allows you to search for movies as per year, votes, genres, directors and actors.
-""")
-
 # Load data from session state
 df = st.session_state.data.copy()
 df2 = st.session_state.data2.copy()
 
-# Combine both DataFrames
+
+# Combine both DataFrames (i wanted to add df2 into the filters but it became too complicated this is what remains)
 combined_df = pd.concat([df, df2], ignore_index=True)
 
-# Convert Released_Year to numeric
+#combining and simplifying 
 combined_df['Released_Year'] = pd.to_numeric(combined_df['Released_Year'], errors='coerce')
-
-# Split genres into individual genres and create a unique list
+##split
 all_genres = combined_df['Genre'].str.split(',').explode().str.strip().unique()
-
-# Combine all actor columns into a single series
+##actors
 all_actors = pd.concat([combined_df['Star1'], combined_df['Star2'], combined_df['Star3'], combined_df['Star4']]).str.strip().unique()
+##writen out
+
 
 # Sidebar filters
 st.sidebar.header("Filters")
 
-# Year range filter
+## Year range filter
 min_year, max_year = int(combined_df['Released_Year'].min()), int(combined_df['Released_Year'].max())
 selected_years = st.sidebar.slider(
     "Select Year Range",
@@ -37,7 +32,7 @@ selected_years = st.sidebar.slider(
     value=(min_year, max_year)
 )
 
-# Number of votes filter
+## Number of votes filter
 min_votes, max_votes = int(combined_df['No_of_Votes'].min()), int(combined_df['No_of_Votes'].max())
 selected_votes = st.sidebar.slider(
     "Select Number of Votes Range",
@@ -45,15 +40,17 @@ selected_votes = st.sidebar.slider(
     max_value=max_votes,
     value=(min_votes, max_votes)
 )
-
+##Dropdown boxes
 selected_genres = st.sidebar.multiselect('Select Genres', all_genres)
 selected_directors = st.sidebar.multiselect('Select Directors', combined_df['Director'].unique())
 selected_actors = st.sidebar.multiselect('Select Actors', all_actors)
 
+
+
 # AND/OR/NOT logic
 logic_mode = st.sidebar.radio("Filter Logic", ("OR (Any Selected Genre/Director/Actor)", "AND (All Selected Genre/Director/Actor)", "NOT (Exclude Selected Genre/Director/Actor)"), index=0)
 
-# Initialize show_list
+##Initialize show_list
 show_list = False
 
 # Filtering logic
@@ -115,10 +112,16 @@ if selected_genres or selected_directors or selected_actors:
 
         filtered_df = filtered_df[filtered_df.apply(lambda row: has_not_criteria(row['Genre'], row['Director'], [row['Star1'], row['Star2'], row['Star3'], row['Star4']]), axis=1)]
 
-# Display the number of filtered movies
+
+st.title("Movie Catalogue")
+st.markdown("""
+This Page allows you to search for movies as per year, votes, genres, directors and actors.
+""")
+
+## Display number of filtered movies
 st.sidebar.markdown(f"**Movies shown:** {len(filtered_df)}")
 
-# Check if any filters are applied
+## filter check 
 if selected_genres or selected_directors or selected_actors or (selected_years != (min_year, max_year)) or (selected_votes != (min_votes, max_votes)):
     show_list = True
 
@@ -128,18 +131,15 @@ st.markdown("<style>img {max-width: 100%; height: auto;}</style>", unsafe_allow_
 st.title("IMDb Top 1000 Movies")
 st.subheader(f"Showing {len(filtered_df)} movies")
 
-#Increasing resolution of Movie posters
+#Increase poster resolution of df
 def enhance_poster_url(poster_url):
     """Use 720p resolution images for better performance"""
     if not poster_url or not poster_url.startswith('https://m.media-amazon.com/images/'):
         return poster_url
-    
-    # Use 720p resolution (smaller than full size but still good quality)
-    # Replace with 720p dimensions
     enhanced_url = poster_url.replace('_V1_UX67_CR0,0,67,98_AL_', '_V1_UX200_CR0,0,200,300_AL_')
     return enhanced_url
 
-# Display movie list with table
+# Display movie list by table
 if len(filtered_df) > 0:
     display_df = filtered_df[[
         'Series_Title', 
@@ -150,10 +150,9 @@ if len(filtered_df) > 0:
         'Star1','Star2','Star3','Star4'
     ]].copy()
 
-    # Add rank column
+    ##rank column
     display_df.insert(0, 'Rank', range(1, len(display_df) + 1))
-
-    # Display without pandas index
+    
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 # Initialize watched_count and watched_list in session state
@@ -166,7 +165,7 @@ tab1, tab2, = st.tabs(["IMDB Movie List", "Movies Watched"])
 # Display results
 with tab1:
     if len(filtered_df) > 0:
-        if show_list:  # Only show list if filters are applied
+        if show_list:
             st.subheader("Movie Details")
             for idx, movie in filtered_df.iterrows():
                 rank = idx + 1
@@ -196,29 +195,6 @@ with tab1:
                             st.session_state.watched_count -= 1
 
                 st.markdown("---")
-
-            st.sidebar.markdown(
-                f"""
-                <style>
-                .sidebar-watched-count {{
-                    position: fixed;
-                    top: 10px;
-                    right: 1400px;
-                    background-color: rgba(0, 0, 0, 0);
-                    padding: 10px;
-                    border-radius: 5px;
-                    box-shadow: 0 2px 5px rgba(0, 0, 0, 0);
-                    z-index: 1000;
-                    font-size: 22px;
-                }}
-                </style>
-                <div class="sidebar-watched-count">
-                    <strong>Movies Watched: {st.session_state.watched_count}</strong>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-              
         else:
             # Show initial message when no filters applied
             st.info("Apply filters above to see movie details")
@@ -228,19 +204,11 @@ with tab1:
         else:
             st.info("Apply filters above to see movie details")
 
-with tab2:
+with tab2: #same as tab3 in Home.py
     st.title("All Movies Watched (Combined)")
-
-    # Combine both lists
     combined_watched = st.session_state.watched_list + st.session_state.watched_list2
-
-    # Remove duplicates (optional, but recommended)
     unique_combined = list(set(combined_watched))
-
-    # Sort alphabetically (optional)
     unique_combined.sort()
-
-    # Display
     if unique_combined:
         st.write(f"Total unique movies watched: {len(unique_combined)}")
         for idx, movie in enumerate(unique_combined, start=1):
