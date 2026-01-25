@@ -9,26 +9,27 @@ st.markdown("""
 This Page allows you to search for movies as per year, votes, genres, directors and actors.
 """)
 
+# Load data from session state
 df = st.session_state.data.copy()
+df2 = st.session_state.data2.copy()
 
-df['Released_Year'] = pd.to_numeric(df['Released_Year'], errors='coerce')
-
+# Combine both DataFrames
+combined_df = pd.concat([df, df2], ignore_index=True)
 
 # Convert Released_Year to numeric
-df['Released_Year'] = pd.to_numeric(df['Released_Year'], errors='coerce')
+combined_df['Released_Year'] = pd.to_numeric(combined_df['Released_Year'], errors='coerce')
 
 # Split genres into individual genres and create a unique list
-all_genres = df['Genre'].str.split(',').explode().str.strip().unique()
+all_genres = combined_df['Genre'].str.split(',').explode().str.strip().unique()
 
 # Combine all actor columns into a single series
-all_actors = pd.concat([df['Star1'], df['Star2'], df['Star3'], df['Star4']]).str.strip().unique()
-
+all_actors = pd.concat([combined_df['Star1'], combined_df['Star2'], combined_df['Star3'], combined_df['Star4']]).str.strip().unique()
 
 # Sidebar filters
 st.sidebar.header("Filters")
 
 # Year range filter
-min_year, max_year = int(df['Released_Year'].min()), int(df['Released_Year'].max())
+min_year, max_year = int(combined_df['Released_Year'].min()), int(combined_df['Released_Year'].max())
 selected_years = st.sidebar.slider(
     "Select Year Range",
     min_value=min_year,
@@ -37,7 +38,7 @@ selected_years = st.sidebar.slider(
 )
 
 # Number of votes filter
-min_votes, max_votes = int(df['No_of_Votes'].min()), int(df['No_of_Votes'].max())
+min_votes, max_votes = int(combined_df['No_of_Votes'].min()), int(combined_df['No_of_Votes'].max())
 selected_votes = st.sidebar.slider(
     "Select Number of Votes Range",
     min_value=min_votes,
@@ -46,7 +47,7 @@ selected_votes = st.sidebar.slider(
 )
 
 selected_genres = st.sidebar.multiselect('Select Genres', all_genres)
-selected_directors = st.sidebar.multiselect('Select Directors', df['Director'].unique())
+selected_directors = st.sidebar.multiselect('Select Directors', combined_df['Director'].unique())
 selected_actors = st.sidebar.multiselect('Select Actors', all_actors)
 
 # AND/OR/NOT logic
@@ -56,13 +57,12 @@ logic_mode = st.sidebar.radio("Filter Logic", ("OR (Any Selected Genre/Director/
 show_list = False
 
 # Filtering logic
-filtered_df = df[
-    (df['Released_Year'] >= selected_years[0]) &
-    (df['Released_Year'] <= selected_years[1]) &
-    (df['No_of_Votes'] >= selected_votes[0]) &
-    (df['No_of_Votes'] <= selected_votes[1])
+filtered_df = combined_df[
+    (combined_df['Released_Year'] >= selected_years[0]) &
+    (combined_df['Released_Year'] <= selected_years[1]) &
+    (combined_df['No_of_Votes'] >= selected_votes[0]) &
+    (combined_df['No_of_Votes'] <= selected_votes[1])
 ]
-
 
 if selected_genres or selected_directors or selected_actors:
     show_list = True
@@ -162,7 +162,7 @@ if 'watched_count' not in st.session_state:
 if 'watched_list' not in st.session_state:
     st.session_state.watched_list = []
 
-tab1, tab2 = st.tabs(["Movie List", "Movies Watched"])
+tab1, tab2, = st.tabs(["IMDB Movie List", "Movies Watched"])
 # Display results
 with tab1:
     if len(filtered_df) > 0:
@@ -227,9 +227,23 @@ with tab1:
             st.write("No movies match your search criteria.")
         else:
             st.info("Apply filters above to see movie details")
+
 with tab2:
-    st.title("Movies Watched")
-    st.write(f"Number of movies watched: {st.session_state.watched_count}")
-    for idx, movie in enumerate(st.session_state.watched_list, start=1):
-        st.write(f"{idx}. {movie}")
-        
+    st.title("All Movies Watched (Combined)")
+
+    # Combine both lists
+    combined_watched = st.session_state.watched_list + st.session_state.watched_list2
+
+    # Remove duplicates (optional, but recommended)
+    unique_combined = list(set(combined_watched))
+
+    # Sort alphabetically (optional)
+    unique_combined.sort()
+
+    # Display
+    if unique_combined:
+        st.write(f"Total unique movies watched: {len(unique_combined)}")
+        for idx, movie in enumerate(unique_combined, start=1):
+            st.write(f"{idx}. {movie}")
+    else:
+        st.write("No movies have been marked as watched yet.")
