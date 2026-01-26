@@ -7,16 +7,13 @@ import seaborn as sns
 df = st.session_state.data.copy()
 df2 = st.session_state.data2.copy()
 
-
-# Combine both DataFrames (i wanted to add df2 into the filters but it became too complicated this is what remains)
-combined_df = pd.concat([df, df2], ignore_index=True)
-
+    
 #combining and simplifying 
-combined_df['Released_Year'] = pd.to_numeric(combined_df['Released_Year'], errors='coerce')
+df['Released_Year'] = pd.to_numeric(df['Released_Year'], errors='coerce')
 ##split
-all_genres = combined_df['Genre'].str.split(',').explode().str.strip().unique()
+all_genres = df['Genre'].str.split(',').explode().str.strip().unique()
 ##actors
-all_actors = pd.concat([combined_df['Star1'], combined_df['Star2'], combined_df['Star3'], combined_df['Star4']]).str.strip().unique()
+all_actors = list(set(df[['Star1', 'Star2', 'Star3', 'Star4']].apply(lambda x: x.str.strip()).values.flatten()))
 ##writen out
 
 
@@ -24,7 +21,7 @@ all_actors = pd.concat([combined_df['Star1'], combined_df['Star2'], combined_df[
 st.sidebar.header("Filters")
 
 ## Year range filter
-min_year, max_year = int(combined_df['Released_Year'].min()), int(combined_df['Released_Year'].max())
+min_year, max_year = int(df['Released_Year'].min()), int(df['Released_Year'].max())
 selected_years = st.sidebar.slider(
     "Select Year Range",
     min_value=min_year,
@@ -33,7 +30,7 @@ selected_years = st.sidebar.slider(
 )
 
 ## Number of votes filter
-min_votes, max_votes = int(combined_df['No_of_Votes'].min()), int(combined_df['No_of_Votes'].max())
+min_votes, max_votes = int(df['No_of_Votes'].min()), int(df['No_of_Votes'].max())
 selected_votes = st.sidebar.slider(
     "Select Number of Votes Range",
     min_value=min_votes,
@@ -42,7 +39,7 @@ selected_votes = st.sidebar.slider(
 )
 ##Dropdown boxes
 selected_genres = st.sidebar.multiselect('Select Genres', all_genres)
-selected_directors = st.sidebar.multiselect('Select Directors', combined_df['Director'].unique())
+selected_directors = st.sidebar.multiselect('Select Directors', df['Director'].unique())
 selected_actors = st.sidebar.multiselect('Select Actors', all_actors)
 
 
@@ -54,11 +51,11 @@ logic_mode = st.sidebar.radio("Filter Logic", ("OR (Any Selected Genre/Director/
 show_list = False
 
 # Filtering logic
-filtered_df = combined_df[
-    (combined_df['Released_Year'] >= selected_years[0]) &
-    (combined_df['Released_Year'] <= selected_years[1]) &
-    (combined_df['No_of_Votes'] >= selected_votes[0]) &
-    (combined_df['No_of_Votes'] <= selected_votes[1])
+filtered_df = df[
+    (df['Released_Year'] >= selected_years[0]) &
+    (df['Released_Year'] <= selected_years[1]) &
+    (df['No_of_Votes'] >= selected_votes[0]) &
+    (df['No_of_Votes'] <= selected_votes[1])
 ]
 
 if selected_genres or selected_directors or selected_actors:
@@ -113,6 +110,7 @@ if selected_genres or selected_directors or selected_actors:
         filtered_df = filtered_df[filtered_df.apply(lambda row: has_not_criteria(row['Genre'], row['Director'], [row['Star1'], row['Star2'], row['Star3'], row['Star4']]), axis=1)]
 
 
+
 st.title("Movie Catalogue")
 st.markdown("""
 This Page allows you to search for movies as per year, votes, genres, directors and actors.
@@ -161,7 +159,7 @@ if 'watched_count' not in st.session_state:
 if 'watched_list' not in st.session_state:
     st.session_state.watched_list = []
 
-tab1, tab2, = st.tabs(["IMDB Movie List", "Movies Watched"])
+tab1, tab2 = st.tabs(["IMDB Movie List", "Movies Watched"])
 # Display results
 with tab1:
     if len(filtered_df) > 0:
@@ -176,13 +174,15 @@ with tab1:
                         st.image(enhance_poster_url(movie['Poster_Link']), width=210)
             
                 with col2:
-                    st.markdown(f"<h2 style='font-size: 24px;'>{rank}. {movie['Series_Title']} ({int(movie['Released_Year'])})</h2>", unsafe_allow_html=True)
+                    st.markdown(f"<h2 style='font-size: 24px; margin-top: 0px;'>{rank}. {movie['Series_Title']} ({int(movie['Released_Year'])})</h2>", unsafe_allow_html=True)
+                    st.markdown(f"*Director:* {movie['Director']}")
                     st.markdown(f"*Rating:* {movie['IMDB_Rating']}")
                     st.markdown(f"*Genre:* {movie['Genre']}")
-                    st.markdown(f"*Director:* {movie['Director']}")
+                    st.markdown(f"*Runtime:* {movie['Runtime']}*min*")
                     st.markdown(f"*Overview:* {movie['Overview']}")
-                    st.markdown(f"*Stars:* {movie['Star1']}, {movie['Star2']}, {movie['Star3']}, {movie['Star4']}")
+                    st.markdown(f"*Actors:* {movie['Star1']}, {movie['Star2']}, {movie['Star3']}, {movie['Star4']}")
                     st.markdown(f"<span style='font-family: monospace;'>*Votes:* {int(movie['No_of_Votes']):,}</span>", unsafe_allow_html=True)
+
              
                 with col3:
                     if st.checkbox(f"Did you watch this movie?", key=f"watched_{idx}", value=(movie['Series_Title'] in st.session_state.watched_list)):
