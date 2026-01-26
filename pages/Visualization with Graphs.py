@@ -7,16 +7,22 @@ import seaborn as sns
 st.title("Comparisions")
 
 df = st.session_state.data.copy()
+df2 = st.session_state.data2.copy()
 
-
-
-# Convert Released_Year to integer
+    
+#combining and simplifying 
 df['Released_Year'] = pd.to_numeric(df['Released_Year'], errors='coerce')
+##split
+all_genres = df['Genre'].str.split(',').explode().str.strip().unique()
+##actors
+all_actors = list(set(df[['Star1', 'Star2', 'Star3', 'Star4']].apply(lambda x: x.str.strip()).values.flatten()))
+##writen out
+
 
 # Sidebar filters
 st.sidebar.header("Filters")
 
-# Year range filter
+## Year range filter
 min_year, max_year = int(df['Released_Year'].min()), int(df['Released_Year'].max())
 selected_years = st.sidebar.slider(
     "Select Year Range",
@@ -25,106 +31,175 @@ selected_years = st.sidebar.slider(
     value=(min_year, max_year)
 )
 
-# Genre filter
-all_genres = df['Genre'].str.split(',').explode().str.strip().unique()
-selected_genres = st.sidebar.multiselect(
-    "Select Genres",
-    options=all_genres,
-    default=[]
+## Number of votes filter
+min_votes, max_votes = int(df['No_of_Votes'].min()), int(df['No_of_Votes'].max())
+selected_votes = st.sidebar.slider(
+    "Select Number of Votes Range",
+    min_value=min_votes,
+    max_value=max_votes,
+    value=(min_votes, max_votes)
 )
+##Dropdown boxes
+selected_genres = st.sidebar.multiselect('Select Genres', all_genres)
+selected_directors = st.sidebar.multiselect('Select Directors', df['Director'].unique())
+selected_actors = st.sidebar.multiselect('Select Actors', all_actors)
 
-# Director filter
-all_directors = df['Director'].str.split(',').explode().str.strip().unique()
-selected_directors = st.sidebar.multiselect(
-    "Select Directors",
-    options=all_directors,
-    default=[]
-)
 
-#AND/OR logic
-logic_mode = st.sidebar.radio("Filter Logic", ("OR (Any Selected Genre/Director)", "AND (All Selected Genre/Director)"), index=0)
-filtered_df = df[
-    (df['Released_Year'] >= selected_years[0]) &
-    (df['Released_Year'] <= selected_years[1])
-]
 
+# AND/OR/NOT logic
+logic_mode = st.sidebar.radio("Filter Logic", ("OR (Any Selected Genre/Director/Actor)", "AND (All Selected Genre/Director/Actor)", "NOT (Exclude Selected Genre/Director/Actor)"), index=0)
+
+##Initialize show_list
 show_list = False
 
-# Genre and director filtering based on logic mode
-if selected_genres or selected_directors:
-    if logic_mode == "AND (All Selected Genre/Director)":
-        def has_all_criteria(movie_genres, movie_directors):
+# Filtering logic
+filtered_df = df[
+    (df['Released_Year'] >= selected_years[0]) &
+    (df['Released_Year'] <= selected_years[1]) &
+    (df['No_of_Votes'] >= selected_votes[0]) &
+    (df['No_of_Votes'] <= selected_votes[1])
+]
+
+if selected_genres or selected_directors or selected_actors:
+    show_list = True
+    if logic_mode == "AND (All Selected Genre/Director/Actor)":
+        def has_all_criteria(movie_genres, movie_directors, movie_actors):
             movie_genres_list = [g.strip().lower() for g in movie_genres.split(',')]
             movie_directors_list = [d.strip().lower() for d in movie_directors.split(',')]
+            movie_actors_list = [a.strip().lower() for a in movie_actors]
             selected_genres_lower = [g.lower() for g in selected_genres]
             selected_directors_lower = [d.lower() for d in selected_directors]
-            
+            selected_actors_lower = [a.lower() for a in selected_actors]
+
             genre_match = all(genre in movie_genres_list for genre in selected_genres_lower) if selected_genres else True
             director_match = all(director in movie_directors_list for director in selected_directors_lower) if selected_directors else True
-            
-            return genre_match and director_match
-        
-        filtered_df = filtered_df[filtered_df.apply(lambda row: has_all_criteria(row['Genre'], row['Director']), axis=1)]
-    else:
-        def has_any_criteria(movie_genres, movie_directors):
+            actor_match = all(actor in movie_actors_list for actor in selected_actors_lower) if selected_actors else True
+
+            return genre_match and director_match and actor_match
+
+        filtered_df = filtered_df[filtered_df.apply(lambda row: has_all_criteria(row['Genre'], row['Director'], [row['Star1'], row['Star2'], row['Star3'], row['Star4']]), axis=1)]
+    elif logic_mode == "OR (Any Selected Genre/Director/Actor)":
+        def has_any_criteria(movie_genres, movie_directors, movie_actors):
             movie_genres_list = [g.strip().lower() for g in movie_genres.split(',')]
             movie_directors_list = [d.strip().lower() for d in movie_directors.split(',')]
+            movie_actors_list = [a.strip().lower() for a in movie_actors]
             selected_genres_lower = [g.lower() for g in selected_genres]
             selected_directors_lower = [d.lower() for d in selected_directors]
-            
+            selected_actors_lower = [a.lower() for a in selected_actors]
+
             genre_match = any(genre in movie_genres_list for genre in selected_genres_lower) if selected_genres else False
             director_match = any(director in movie_directors_list for director in selected_directors_lower) if selected_directors else False
-            
-            return genre_match or director_match
-        
-        filtered_df = filtered_df[filtered_df.apply(lambda row: has_any_criteria(row['Genre'], row['Director']), axis=1)]
+            actor_match = any(actor in movie_actors_list for actor in selected_actors_lower) if selected_actors else False
 
-st.sidebar.markdown(f"**Movies shown:** {len(filtered_df)}")
+            return genre_match or director_match or actor_match
+
+        filtered_df = filtered_df[filtered_df.apply(lambda row: has_any_criteria(row['Genre'], row['Director'], [row['Star1'], row['Star2'], row['Star3'], row['Star4']]), axis=1)]
+    elif logic_mode == "NOT (Exclude Selected Genre/Director/Actor)":
+        def has_not_criteria(movie_genres, movie_directors, movie_actors):
+            movie_genres_list = [g.strip().lower() for g in movie_genres.split(',')]
+            movie_directors_list = [d.strip().lower() for d in movie_directors.split(',')]
+            movie_actors_list = [a.strip().lower() for a in movie_actors]
+            selected_genres_lower = [g.lower() for g in selected_genres]
+            selected_directors_lower = [d.lower() for d in selected_directors]
+            selected_actors_lower = [a.lower() for a in selected_actors]
+
+            genre_match = not any(genre in movie_genres_list for genre in selected_genres_lower) if selected_genres else True
+            director_match = not any(director in movie_directors_list for director in selected_directors_lower) if selected_directors else True
+            actor_match = not any(actor in movie_actors_list for actor in selected_actors_lower) if selected_actors else True
+
+            return genre_match and director_match and actor_match
+
+        filtered_df = filtered_df[filtered_df.apply(lambda row: has_not_criteria(row['Genre'], row['Director'], [row['Star1'], row['Star2'], row['Star3'], row['Star4']]), axis=1)]
+
 
 
 # Row 1: Ratings Distribution & Top Directors
-col1, col2 = st.columns(2)
 
-with col1:
-    st.subheader("Rating Distribution")
-    fig1, ax1 = plt.subplots(figsize=(6, 4))
-    sns.histplot(filtered_df['IMDB_Rating'], bins=20, kde=True, ax=ax1, color='skyblue')
-    ax1.set_title("Distribution of IMDb Ratings")
-    ax1.set_xlabel("IMDB Rating")
-    ax1.set_ylabel("Frequency")
-    st.pyplot(fig1)
-
-with col2:
-    st.subheader("Top Directors (by Movie Count)")
-    top_directors = filtered_df['Director'].value_counts().head(10)
-    fig2, ax2 = plt.subplots(figsize=(6, 4))
-    top_directors.plot(kind='barh', ax=ax2, color='lightgreen')
-    ax2.set_title("Top Directors (by Number of Movies)")
-    ax2.set_xlabel("Number of Movies")
-    st.pyplot(fig2)
+tab1, tab2 = st.tabs(["IMDb Top 1000","Netflix List"]) 
 
 
-    # Row 2: Genre Distribution & Box Office
-col3, col4 = st.columns(2)
 
-with col3:
-    st.subheader("Genre Distribution")
-    genre_series = filtered_df['Genre'].str.split(',').explode().str.strip()
-    genre_counts = genre_series.value_counts()
-    fig3, ax3 = plt.subplots(figsize=(6, 4))
-    genre_counts.plot(kind='bar', ax=ax3, color='salmon')
-    ax3.set_title("Movies by Genre")
-    ax3.set_xlabel("Genre")
-    ax3.set_ylabel("Number of Movies")
-    plt.xticks(rotation=45)
-    st.pyplot(fig3)
+with tab1: 
+    if filtered_df.empty:
+        st.info("No Results Found The selected filters did not return any movies. Please adjust your filters and try again.")
+    else:     
+        col1, col2 = st.columns(2)
+        with col1: #distribution of IMDb ratings
+            st.subheader("Rating Distribution")
+            fig1, ax1 = plt.subplots(figsize=(6, 4))
+            if not filtered_df['IMDB_Rating'].empty:
+                sns.histplot(filtered_df['IMDB_Rating'], bins=20, kde=True, ax=ax1, color='skyblue')
+                ax1.set_title("Distribution of IMDb Ratings")
+                ax1.set_xlabel("IMDB Rating")
+                ax1.set_ylabel("Frequency")
+                st.pyplot(fig1)
+            else:
+                st.write("No IMDB Ratings available for the selected filters.")
+        with col2: #Top directors by movie count 
+            if not filtered_df['IMDB_Rating'].empty:
+                st.subheader("Top Directors (by Movie Count)")
+                top_directors = filtered_df['Director'].value_counts().head(10)
+                fig2, ax2 = plt.subplots(figsize=(6, 4))
+                top_directors.plot(kind='barh', ax=ax2, color='lightgreen')
+                ax2.set_title("Top Directors (by Number of Movies)")
+                ax2.set_xlabel("Number of Movies")
+                st.pyplot(fig2)
+            else:
+                st.write("No IMDB Ratings available for the selected filters.")
+       
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            if not filtered_df['IMDB_Rating'].empty:
+                st.subheader("Genre Distribution")
+                genre_series = filtered_df['Genre'].str.split(',').explode().str.strip()
+                genre_counts = genre_series.value_counts()
+                fig3, ax3 = plt.subplots(figsize=(6, 4))
+                genre_counts.plot(kind='bar', ax=ax3, color='salmon')
+                ax3.set_title("Movies by Genre")
+                ax3.set_xlabel("Genre")
+                ax3.set_ylabel("Number of Movies")
+                plt.xticks(rotation=45)
+                st.pyplot(fig3)
+            else:
+                st.write("No IMDB Ratings available for the selected filters.")
+        with col4:
+            if not filtered_df['IMDB_Rating'].empty:
+                st.subheader("IMDB Rating vs Released Year (Every 5 Years)")
+                # bins for every 5 years
+                col4_bins = range(int(filtered_df['Released_Year'].min()), int(filtered_df['Released_Year'].max()) + 5, 5)
+                filtered_df['Year_Bin'] = pd.cut(filtered_df['Released_Year'], col4_bins, right=False, include_lowest=True)
+        
+                # Ensure the Year_Bin column is not empty
+                if not filtered_df['Year_Bin'].isnull().all():
+                    fig4, ax4 = plt.subplots(figsize=(6, 4))
+                    sns.boxplot(data=filtered_df, x='Year_Bin', y='IMDB_Rating', palette='viridis', ax=ax4)
+                    ax4.set_title("IMDB Rating vs Released Year (Every 5 Years)")
+                    ax4.set_xlabel("Released Year (Every 5 Years)")
+                    ax4.set_ylabel("IMDB Rating")
+                    plt.xticks(rotation=45)
+                    st.pyplot(fig4)
+                else:
+                    st.write("No data available for the selected filters.")
+            else:
+                st.write("No IMDB Ratings available for the selected filters.")
 
-with col4:
-    st.subheader("Box Office Performance (Top 20)")
-    top_grossing = filtered_df[['Series_Title', 'Gross']].dropna().sort_values(by='Gross', ascending=False).head(20)
-    fig4, ax4 = plt.subplots(figsize=(6, 4))
-    ax4.barh(top_grossing['Series_Title'], top_grossing['Gross'], color='gold')
-    ax4.set_title("Top 20 Highest Grossing Movies")
-    ax4.set_xlabel("Gross (in USD)")
-    st.pyplot(fig4)
+        col5, col6 = st.columns(2)
+        with col5:
+            if not filtered_df['IMDB_Rating'].empty:
+                if not filtered_df['IMDB_Rating'].empty:
+                    st.subheader("Runtime vs. IMDB Rating (Runtime Bins)")
+                    bins = range(int(filtered_df['Runtime'].min()), int(filtered_df['Runtime'].max()) + 30, 30)
+                    filtered_df['Runtime_Bin'] = pd.cut(filtered_df['Runtime'], bins, right=False, include_lowest=True)            
+                    fig5, ax5 = plt.subplots(figsize=(6, 4))
+                    sns.scatterplot(data=filtered_df, x='Runtime', y='IMDB_Rating', ax=ax5)
+                    ax5.set_title("Runtime vs. IMDB Rating (Runtime Bins)")
+                    ax5.set_xlabel("Runtime (minutes)")
+                    ax5.set_ylabel("IMDB Rating")
+                    st.pyplot(fig5)
+                else:
+                    st.write("No IMDB Ratings available for the selected filters.")
+            
+with tab2: 
+   st.title("Graphs") 
     
