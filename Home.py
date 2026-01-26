@@ -149,9 +149,10 @@ with tab1:
 
                 with col2:
                     st.markdown(f"<h2 style='font-size: 24px; margin-top: 0px;'>{rank}. {movie['Series_Title']} ({int(movie['Released_Year'])})</h2>", unsafe_allow_html=True)
+                    st.markdown(f"*Director:* {movie['Director']}")
                     st.markdown(f"*Rating:* {movie['IMDB_Rating']}")
                     st.markdown(f"*Genre:* {movie['Genre']}")
-                    st.markdown(f"*Director:* {movie['Director']}")
+                    st.markdown(f"*Runtime:* {movie['Runtime']}*min*")
                     st.markdown(f"*Overview:* {movie['Overview']}")
                     st.markdown(f"*Actors:* {movie['Star1']}, {movie['Star2']}, {movie['Star3']}, {movie['Star4']}")
                     st.markdown(f"<span style='font-family: monospace;'>*Votes:* {int(movie['No_of_Votes']):,}</span>", unsafe_allow_html=True)
