@@ -9,21 +9,42 @@ st.title("Comparisions")
 df = st.session_state.data.copy()
 df2 = st.session_state.data2.copy()
 
-    
-#combining and simplifying 
+
+#Cleaning cast list for dataframe 2 
+df2['cast_clean'] = (
+    df2['cast']
+    .str.replace("'", "", regex=True)
+    .str.replace(r"^\s*", "", regex=True)
+    .str.replace(r"\s*$", "", regex=True)
+    .str.replace(r",\s*", ", ", regex=True)
+    .str.strip()
+)
+#combining and simplifying df and df2
+#df
 df['Released_Year'] = pd.to_numeric(df['Released_Year'], errors='coerce')
-##split
+##split genres
 all_genres = df['Genre'].str.split(',').explode().str.strip().unique()
 ##actors
 all_actors = list(set(df[['Star1', 'Star2', 'Star3', 'Star4']].apply(lambda x: x.str.strip()).values.flatten()))
-##writen out
+
+#df2
+df2['startYear'] = pd.to_numeric(df2['startYear'], errors='coerce')
+df2['endYear'] = pd.to_numeric(df2['endYear'], errors='coerce')
+df2['numVotes'] = pd.to_numeric(df2['numVotes'], errors='coerce')
+all_genres_df2 = df2['genres'].str.split(',').explode().str.strip().unique()
+all_actors_df2 = list(set(df2['cast'].str.split(',').explode().str.strip().unique()))
+
+# Combine all genres and actors from df and df2
+all_genres = list(set(all_genres).union(set(all_genres_df2)))
+all_actors = list(set(all_actors).union(set(all_actors_df2)))
 
 
 # Sidebar filters
 st.sidebar.header("Filters")
 
 ## Year range filter
-min_year, max_year = int(df['Released_Year'].min()), int(df['Released_Year'].max())
+min_year = int(df['Released_Year'].min())
+max_year = int(df2['endYear'].max())
 selected_years = st.sidebar.slider(
     "Select Year Range",
     min_value=min_year,
@@ -32,7 +53,7 @@ selected_years = st.sidebar.slider(
 )
 
 ## Number of votes filter
-min_votes, max_votes = int(df['No_of_Votes'].min()), int(df['No_of_Votes'].max())
+min_votes, max_votes = int(min(df['No_of_Votes'].min(), df2['numVotes'].min())), int(max(df['No_of_Votes'].max(), df2['numVotes'].max()))
 selected_votes = st.sidebar.slider(
     "Select Number of Votes Range",
     min_value=min_votes,
@@ -52,7 +73,7 @@ logic_mode = st.sidebar.radio("Filter Logic", ("OR (Any Selected Genre/Director/
 ##Initialize show_list
 show_list = False
 
-# Filtering logic
+# Filtering logic for df and df2
 filtered_df = df[
     (df['Released_Year'] >= selected_years[0]) &
     (df['Released_Year'] <= selected_years[1]) &
@@ -60,59 +81,43 @@ filtered_df = df[
     (df['No_of_Votes'] <= selected_votes[1])
 ]
 
+filtered_df2 = df2[
+    (df2['startYear'] >= selected_years[0]) &
+    (df2['endYear'] <= selected_years[1]) &
+    (df2['numVotes'] >= selected_votes[0]) &
+    (df2['numVotes'] <= selected_votes[1])
+]
+
 if selected_genres or selected_directors or selected_actors:
     show_list = True
-    if logic_mode == "AND (All Selected Genre/Director/Actor)":
-        def has_all_criteria(movie_genres, movie_directors, movie_actors):
-            movie_genres_list = [g.strip().lower() for g in movie_genres.split(',')]
-            movie_directors_list = [d.strip().lower() for d in movie_directors.split(',')]
-            movie_actors_list = [a.strip().lower() for a in movie_actors]
-            selected_genres_lower = [g.lower() for g in selected_genres]
-            selected_directors_lower = [d.lower() for d in selected_directors]
-            selected_actors_lower = [a.lower() for a in selected_actors]
+    def filter_criteria(movie_genres, movie_directors, movie_actors, logic_mode):
+        movie_genres_list = [g.strip().lower() for g in movie_genres.split(',')]
+        movie_directors_list = [d.strip().lower() for d in movie_directors.split(',')]
+        movie_actors_list = [a.strip().lower() for a in movie_actors]
+        selected_genres_lower = [g.lower() for g in selected_genres]
+        selected_directors_lower = [d.lower() for d in selected_directors]
+        selected_actors_lower = [a.lower() for a in selected_actors]
 
+        if logic_mode == "AND (All Selected Genre/Director/Actor)":
             genre_match = all(genre in movie_genres_list for genre in selected_genres_lower) if selected_genres else True
             director_match = all(director in movie_directors_list for director in selected_directors_lower) if selected_directors else True
             actor_match = all(actor in movie_actors_list for actor in selected_actors_lower) if selected_actors else True
-
             return genre_match and director_match and actor_match
-
-        filtered_df = filtered_df[filtered_df.apply(lambda row: has_all_criteria(row['Genre'], row['Director'], [row['Star1'], row['Star2'], row['Star3'], row['Star4']]), axis=1)]
-    elif logic_mode == "OR (Any Selected Genre/Director/Actor)":
-        def has_any_criteria(movie_genres, movie_directors, movie_actors):
-            movie_genres_list = [g.strip().lower() for g in movie_genres.split(',')]
-            movie_directors_list = [d.strip().lower() for d in movie_directors.split(',')]
-            movie_actors_list = [a.strip().lower() for a in movie_actors]
-            selected_genres_lower = [g.lower() for g in selected_genres]
-            selected_directors_lower = [d.lower() for d in selected_directors]
-            selected_actors_lower = [a.lower() for a in selected_actors]
-
+        elif logic_mode == "OR (Any Selected Genre/Director/Actor)":
             genre_match = any(genre in movie_genres_list for genre in selected_genres_lower) if selected_genres else False
             director_match = any(director in movie_directors_list for director in selected_directors_lower) if selected_directors else False
             actor_match = any(actor in movie_actors_list for actor in selected_actors_lower) if selected_actors else False
-
             return genre_match or director_match or actor_match
-
-        filtered_df = filtered_df[filtered_df.apply(lambda row: has_any_criteria(row['Genre'], row['Director'], [row['Star1'], row['Star2'], row['Star3'], row['Star4']]), axis=1)]
-    elif logic_mode == "NOT (Exclude Selected Genre/Director/Actor)":
-        def has_not_criteria(movie_genres, movie_directors, movie_actors):
-            movie_genres_list = [g.strip().lower() for g in movie_genres.split(',')]
-            movie_directors_list = [d.strip().lower() for d in movie_directors.split(',')]
-            movie_actors_list = [a.strip().lower() for a in movie_actors]
-            selected_genres_lower = [g.lower() for g in selected_genres]
-            selected_directors_lower = [d.lower() for d in selected_directors]
-            selected_actors_lower = [a.lower() for a in selected_actors]
-
+        elif logic_mode == "NOT (Exclude Selected Genre/Director/Actor)":
             genre_match = not any(genre in movie_genres_list for genre in selected_genres_lower) if selected_genres else True
             director_match = not any(director in movie_directors_list for director in selected_directors_lower) if selected_directors else True
             actor_match = not any(actor in movie_actors_list for actor in selected_actors_lower) if selected_actors else True
-
             return genre_match and director_match and actor_match
 
-        filtered_df = filtered_df[filtered_df.apply(lambda row: has_not_criteria(row['Genre'], row['Director'], [row['Star1'], row['Star2'], row['Star3'], row['Star4']]), axis=1)]
+    filtered_df = filtered_df[filtered_df.apply(lambda row: filter_criteria(row['Genre'], row['Director'], [row['Star1'], row['Star2'], row['Star3'], row['Star4']], logic_mode), axis=1)]
+    filtered_df2 = filtered_df2[filtered_df2.apply(lambda row: filter_criteria(row['genres'], '', row['cast'].split(','), logic_mode), axis=1)]
 
-
-
+combined_filtered_df = pd.concat([filtered_df, filtered_df2], ignore_index=True)
 # Row 1: Ratings Distribution & Top Directors
 
 tab1, tab2 = st.tabs(["IMDb Top 1000","Netflix List"]) 
@@ -128,7 +133,7 @@ with tab1:
             st.subheader("Rating Distribution")
             fig1, ax1 = plt.subplots(figsize=(6, 4))
             if not filtered_df['IMDB_Rating'].empty:
-                sns.histplot(filtered_df['IMDB_Rating'], bins=20, kde=True, ax=ax1, color='skyblue')
+                sns.histplot(filtered_df['IMDB_Rating'], kde=True, ax=ax1, color='skyblue')
                 ax1.set_title("Distribution of IMDb Ratings")
                 ax1.set_xlabel("IMDB Rating")
                 ax1.set_ylabel("Frequency")
@@ -201,5 +206,20 @@ with tab1:
                     st.write("No IMDB Ratings available for the selected filters.")
             
 with tab2: 
-   st.title("Graphs") 
+    st.title("Graphs") 
+    if combined_filtered_df.empty:
+        st.info("No Results Found. The selected filters did not return any movies. Please adjust your filters and try again.")
+    else:
+        col1, col2 = st.columns(2)
+        with col1:  # distribution of IMDb ratings
+            st.subheader("Rating Distribution")
+            fig1, ax1 = plt.subplots(figsize=(6, 4))
+            if not combined_filtered_df['rating'].empty:
+                sns.histplot(combined_filtered_df['rating'], kde=True, ax=ax1, color='skyblue')
+                ax1.set_title("Distribution of Netflix Ratings")
+                ax1.set_xlabel("Netflix Rating")
+                ax1.set_ylabel("Frequency")
+                st.pyplot(fig1)
+            else:
+                st.write("No Netflix Ratings available for the selected filters.")
     
