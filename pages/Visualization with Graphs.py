@@ -188,7 +188,7 @@ with tab1:
             else:
                 st.write("Insufficient data to generate the graph based on the selected filters.")
 
-        col5 = st.columns(1)
+        col5,col6 = st.columns(2)
         with col5:
             #runtime vs rating
             if not filtered_df['IMDB_Rating'].empty:
