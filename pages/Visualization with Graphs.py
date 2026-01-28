@@ -207,7 +207,7 @@ with tab1:
             
 with tab2: 
     st.title("Graphs") 
-    if combined_filtered_df2.empty:
+    if filtered_df2.empty:
         st.info("No Results Found. The selected filters did not return any movies. Please adjust your filters and try again.")
     else:
         # Row 1: Ratings Distribution & Movies by country 
