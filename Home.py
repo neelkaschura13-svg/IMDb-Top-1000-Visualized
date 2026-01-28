@@ -109,7 +109,7 @@ st.set_page_config(layout="wide")
 ## Homepage title and summary
 st.markdown("<h1 style='font-size: 69px;'>Film List: IMDb & Netflix</h1>", unsafe_allow_html=True)
 st.markdown("""
-This app showcases IMDb's Top 1000 Movies as of 2020 and a catalog of 7000 movies, TV shows and specials from Netflix. It features an interactive movie catalog with multiple filters to sort by genre, director, and cast presented by a spreadsheet and list with movie posters. Additionally, the app includes a visualization section where you can select filters to generate graphs, providing a way to analyze and discover top-rated films.
+This app showcases IMDb's Top 1000 Movies as of 2020 and a catalog of 7000 movies, TV shows and specials from Netflix. It features an interactive movie catalog with multiple filters to sort by genre, director, and cast presented by a spreadsheet and list with movie posters. Additionally, the app allows you to track the movies you watched. It also has a visualization section where you can select filters to generate graphs, providing a way to analyze and discover top-rated films.
 """)
 
 # Tabs
