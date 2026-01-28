@@ -113,7 +113,7 @@ if selected_genres or selected_directors or selected_actors:
 
 st.title("Movie Catalogue")
 st.markdown("""
-This Page allows you to search for movies as per year, votes, genres, directors and actors.
+This Page allows you to search for movies as per year, votes, genres, directors and actors. You can also see the movies you have watched.
 """)
 
 ## Display number of filtered movies
