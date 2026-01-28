@@ -88,6 +88,8 @@ filtered_df2 = df2[
     (df2['numVotes'] <= selected_votes[1])
 ]
 
+#this was my attempt at making the logic simplier and more efficent 
+# i realized that i could just have one def for all criteria and branch off of it for the and or and not 
 if selected_genres or selected_directors or selected_actors:
     show_list = True
     def filter_criteria(movie_genres, movie_directors, movie_actors, logic_mode):
@@ -118,18 +120,17 @@ if selected_genres or selected_directors or selected_actors:
     filtered_df2 = filtered_df2[filtered_df2.apply(lambda row: filter_criteria(row['genres'], '', row['cast'].split(','), logic_mode), axis=1)]
 
 combined_filtered_df = pd.concat([filtered_df, filtered_df2], ignore_index=True)
-# Row 1: Ratings Distribution & Top Directors
+
 
 tab1, tab2 = st.tabs(["IMDb Top 1000","Netflix List"]) 
-
-
 
 with tab1: 
     if filtered_df.empty:
         st.info("No Results Found The selected filters did not return any movies. Please adjust your filters and try again.")
     else:     
         col1, col2 = st.columns(2)
-        with col1: #distribution of IMDb ratings
+        # Row 1: Ratings Distribution & Top Directors
+        with col1:
             st.subheader("Rating Distribution")
             fig1, ax1 = plt.subplots(figsize=(6, 4))
             if not filtered_df['IMDB_Rating'].empty:
@@ -139,8 +140,8 @@ with tab1:
                 ax1.set_ylabel("Frequency")
                 st.pyplot(fig1)
             else:
-                st.write("No IMDB Ratings available for the selected filters.")
-        with col2: #Top directors by movie count 
+                st.write("Insufficient data to generate the graph based on the selected filters.")
+        with col2:
             if not filtered_df['IMDB_Rating'].empty:
                 st.subheader("Top Directors (by Movie Count)")
                 top_directors = filtered_df['Director'].value_counts().head(10)
@@ -150,10 +151,10 @@ with tab1:
                 ax2.set_xlabel("Number of Movies")
                 st.pyplot(fig2)
             else:
-                st.write("No IMDB Ratings available for the selected filters.")
+                st.write("Insufficient data to generate the graph based on the selected filters.")
        
         col3, col4 = st.columns(2)
-        
+        # row 2: genre distribution and release year vs rating
         with col3:
             if not filtered_df['IMDB_Rating'].empty:
                 st.subheader("Genre Distribution")
@@ -167,7 +168,7 @@ with tab1:
                 plt.xticks(rotation=45)
                 st.pyplot(fig3)
             else:
-                st.write("No IMDB Ratings available for the selected filters.")
+                st.write("Insufficient data to generate the graph based on the selected filters.")
         with col4:
             if not filtered_df['IMDB_Rating'].empty:
                 st.subheader("IMDB Rating vs Released Year (Every 5 Years)")
@@ -184,16 +185,15 @@ with tab1:
                     ax4.set_ylabel("IMDB Rating")
                     plt.xticks(rotation=45)
                     st.pyplot(fig4)
-                else:
-                    st.write("No data available for the selected filters.")
             else:
-                st.write("No IMDB Ratings available for the selected filters.")
+                st.write("Insufficient data to generate the graph based on the selected filters.")
 
-        col5, col6 = st.columns(2)
+        col5 = st.columns(1)
         with col5:
+            #runtime vs rating
             if not filtered_df['IMDB_Rating'].empty:
                 if not filtered_df['IMDB_Rating'].empty:
-                    st.subheader("Runtime vs. IMDB Rating (Runtime Bins)")
+                    st.subheader("Runtime vs. IMDB Rating")
                     bins = range(int(filtered_df['Runtime'].min()), int(filtered_df['Runtime'].max()) + 30, 30)
                     filtered_df['Runtime_Bin'] = pd.cut(filtered_df['Runtime'], bins, right=False, include_lowest=True)            
                     fig5, ax5 = plt.subplots(figsize=(6, 4))
@@ -203,23 +203,71 @@ with tab1:
                     ax5.set_ylabel("IMDB Rating")
                     st.pyplot(fig5)
                 else:
-                    st.write("No IMDB Ratings available for the selected filters.")
+                    st.write("Insufficient data to generate the graph based on the selected filters.")
             
 with tab2: 
     st.title("Graphs") 
     if combined_filtered_df.empty:
         st.info("No Results Found. The selected filters did not return any movies. Please adjust your filters and try again.")
     else:
+        # Row 1: Ratings Distribution & Movies by country 
         col1, col2 = st.columns(2)
         with col1:  # distribution of IMDb ratings
             st.subheader("Rating Distribution")
             fig1, ax1 = plt.subplots(figsize=(6, 4))
-            if not combined_filtered_df['rating'].empty:
+            if not filtered_df2['rating'].empty:
                 sns.histplot(combined_filtered_df['rating'], kde=True, ax=ax1, color='skyblue')
                 ax1.set_title("Distribution of Netflix Ratings")
                 ax1.set_xlabel("Netflix Rating")
                 ax1.set_ylabel("Frequency")
                 st.pyplot(fig1)
             else:
-                st.write("No Netflix Ratings available for the selected filters.")
+                st.write("Insufficient data to generate the graph based on the selected filters.")
+
+        with col2:
+            if not filtered_df2['rating'].empty:
+                st.subheader("Amount of Movies/Series Produced by Country")
+                top_directors = filtered_df2['orign_country'].value_counts().head(10)
+                fig2, ax2 = plt.subplots(figsize=(6, 4))
+                top_directors.plot(kind='barh', ax=ax2, color='lightgreen')
+                ax2.set_title("Amount of Movies/Series Produced by Country")
+                ax2.set_xlabel("Number of Movies")
+                ax2.set_ylabel("Country")
+                st.pyplot(fig2)
+            else:
+                st.write("Insufficient data to generate the graph based on the selected filters.")
+
+        col3, col4 = st.columns(2)
+                # row 2: genre distribution and release year vs rating
+        with col3:
+            if not filtered_df2['rating'].empty:
+                st.subheader("Genre Distribution")
+                genre_series2 = filtered_df2['genres'].str.split(',').explode().str.strip()
+                genre_counts2 = genre_series2.value_counts()
+                fig3, ax3 = plt.subplots(figsize=(6, 4))
+                genre_counts2.plot(kind='bar', ax=ax3, color='salmon')
+                ax3.set_title("Movies by Genre")
+                ax3.set_xlabel("Genre")
+                ax3.set_ylabel("Number of Movies")
+                plt.xticks(rotation=40)
+                st.pyplot(fig3)
+            else:
+                st.write("NInsufficient data to generate the graph based on the selected filters.")
+
+        with col4:
+            if not filtered_df2['rating'].empty:
+                st.subheader("Rating vs Release year")
+                col4_bins = range(int(filtered_df2['startYear'].min()), int(filtered_df2['startYear'].max()) + 5, 5)
+                filtered_df2['Year_Bin2'] = pd.cut(filtered_df2['startYear'], col4_bins, right=False, include_lowest=True)
+    
+                if not filtered_df2['Year_Bin2'].isnull().all():
+                    fig4, ax4 = plt.subplots(figsize=(6, 4))
+                    sns.boxplot(data=filtered_df2, x='Year_Bin2', y='rating', palette='viridis', ax=ax4)
+                    ax4.set_title("Netflix Rating vs Released Year (Every 5 Years)")
+                    ax4.set_xlabel("Released Year (Every 5 Years)")
+                    ax4.set_ylabel("Netflix Rating")
+                    plt.xticks(rotation=45)
+                    st.pyplot(fig4)
+            else:
+                st.write("Insufficient data to generate the graph based on the selected filters.")   
     
