@@ -50,6 +50,7 @@ if 'data' not in st.session_state:
     st.session_state.data = load_data()
 if 'data2' not in st.session_state:
     st.session_state.data2 = load_data2()
+    
 df = st.session_state.data.copy()
 df2 = st.session_state.data2.copy()
 
@@ -117,8 +118,7 @@ tab1, tab2, tab3 = st.tabs(["Imdb Top 1000", "Netflix TV Shows and Movies", "Wat
 
 with tab1:
     #Search
-    search_query = st.text_input("", placeholder="Search Movies by Title, Director, Genre, or Actor")
-    
+    search_query = st.text_input("", placeholder="Search Movies by Title, Director, Genre, or Actor").strip() 
     # Initialize with empty dataframe
     filtered_df = pd.DataFrame()
     #case and space sensetivity 
@@ -210,11 +210,11 @@ with tab2:
                     
                     start_year = safe_int(movie['startYear'])
                     
-                    # checks if a movie 
+                    # checks if a movie
                     if movie['type'] == 'movie':
                         years_text = f"({start_year})"
-                    # if not movie: 
-                    elif movie['type'] == 'tvSeries' or 'tvMiniSeries':
+                    # if not movie:
+                    elif movie['type'] in ['tvSeries', 'tvMiniSeries']:
                         if pd.isna(movie['endYear']):
                             #if series still running
                             years_text = f"({start_year}) – (Present (as of 2021))"
@@ -225,6 +225,7 @@ with tab2:
                     else:
                         # safety incase unknown
                         years_text = f"({start_year})"
+
                     
                     #finally display results
                     st.markdown(
@@ -249,7 +250,7 @@ with tab2:
                             st.session_state.watched_list2.remove(movie['title'])
                             st.session_state.watched_count2 -= 1
                             
-                    st.markdown("---")
+                st.markdown("---")
         else:
             st.write("No movies match your search criteria. Try searching by movie title, director, genre, or lead actor.")
 
